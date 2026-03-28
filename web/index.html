@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 File Browser</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>S3 File Browser</h1>
+            <div class="profile-info" id="profileInfo">Loading...</div>
+        </header>
+        
+        <div class="breadcrumb" id="breadcrumb">
+            <a href="#" data-path="">Home</a>
+        </div>
+        
+        <div class="toolbar">
+            <button id="uploadBtn" class="btn">Upload File</button>
+            <button id="refreshBtn" class="btn">Refresh</button>
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <div class="loading">Loading...</div>
+        </div>
+        
+        <div class="status-bar" id="statusBar">
+            Ready
+        </div>
+    </div>
+    
+    <input type="file" id="fileInput" style="display: none;">
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>
