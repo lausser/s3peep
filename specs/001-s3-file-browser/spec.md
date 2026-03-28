@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-s3-file-browser`  
 **Created**: 2026-03-28  
-**Status**: Draft  
+**Status**: Completed  
 **Input**: User description: "initial spec for a simple file browser/downloader/uploader for S3-compatible storage"
 
 ## Clarifications
