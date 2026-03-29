@@ -1,0 +1,4 @@
+{
+  "active_profile": 123,
+  "profiles": [{"name":"test","region":"us-east-1","access_key_id":"k","secret_access_key":"s","bucket":"b"}]
+}

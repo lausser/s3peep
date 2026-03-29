@@ -1,0 +1,30 @@
+# Build stage
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /go/src/app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /s3peep ./cmd/s3peep
+
+# Runtime stage
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /home/s3peep
+
+COPY --from=builder /s3peep ./s3peep
+COPY web/ ./web/
+
+# Create default config pointing to MinIO (for root user, no bucket specified)
+RUN mkdir -p /root/.config/s3peep && \
+    echo '{"active_profile":"test","profiles":[{"name":"test","region":"us-east-1","access_key_id":"minioadmin","secret_access_key":"minioadmin","endpoint_url":"http://minio:9000"}]}' \
+    > /root/.config/s3peep/config.json
+
+EXPOSE 8080
+
+ENTRYPOINT ["/home/s3peep/s3peep"]
+CMD ["serve", "--port", "8080"]

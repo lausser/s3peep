@@ -15,7 +15,7 @@ func NewCLI(configPath string) *CLI {
 }
 
 func (c *CLI) Run(args []string) error {
-	if len(args) < 3 {
+	if len(args) < 1 {
 		return fmt.Errorf("usage: s3peep profile <command>")
 	}
 
@@ -24,17 +24,17 @@ func (c *CLI) Run(args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	switch args[2] {
+	switch args[0] {
 	case "add":
-		return c.addProfile(cfg, args[3:])
+		return c.addProfile(cfg, args[1:])
 	case "list":
 		return c.listProfiles(cfg)
 	case "switch":
-		return c.switchProfile(cfg, args[3:])
+		return c.switchProfile(cfg, args[1:])
 	case "remove":
-		return c.removeProfile(cfg, args[3:])
+		return c.removeProfile(cfg, args[1:])
 	default:
-		return fmt.Errorf("unknown command: %s", args[2])
+		return fmt.Errorf("unknown command: %s", args[0])
 	}
 }
 

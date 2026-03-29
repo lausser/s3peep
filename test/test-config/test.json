@@ -1,0 +1,21 @@
+{
+  "active_profile": "new-profile",
+  "profiles": [
+    {
+      "name": "original",
+      "region": "us-east-1",
+      "access_key_id": "minioadmin",
+      "secret_access_key": "minioadmin",
+      "endpoint_url": "http://minio:9000",
+      "bucket": "original-bucket"
+    },
+    {
+      "name": "new-profile",
+      "region": "us-west-2",
+      "access_key_id": "key",
+      "secret_access_key": "secret",
+      "endpoint_url": "http://minio:9000",
+      "bucket": "new-bucket"
+    }
+  ]
+}

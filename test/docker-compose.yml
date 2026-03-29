@@ -1,0 +1,49 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: s3peep-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    security_opt:
+      - label=disable
+    volumes:
+      - minio-data:/data
+
+  s3peep:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile.s3peep
+    container_name: s3peep-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - minio
+    security_opt:
+      - label=disable
+
+  testrunner:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile.testrunner
+    container_name: s3peep-testrunner
+    depends_on:
+      - minio
+      - s3peep
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      S3PEEP_ENDPOINT: http://s3peep:8080
+    security_opt:
+      - label=disable
+    volumes:
+      - ./test-config:/app/test-config:z
+    command: ["./run_tests.sh"]
+
+volumes:
+  minio-data:

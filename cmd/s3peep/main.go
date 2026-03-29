@@ -15,7 +15,6 @@ import (
 
 var (
 	configFlag = flag.String("config", "", "Path to config file (or set $CONFIG)")
-	port       = flag.Int("port", 8080, "HTTP server port")
 )
 
 func getConfigPath() string {
@@ -41,12 +40,17 @@ func main() {
 	switch args[0] {
 	case "profile":
 		cli := config.NewCLI(cfgPath)
-		if err := cli.Run(append([]string{os.Args[0]}, args[1:]...)); err != nil {
+		if err := cli.Run(args[1:]); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	case "serve":
-		runServer(cfgPath)
+		port, err := parseServeArgs(args[1:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		runServer(cfgPath, port)
 	case "init":
 		if err := config.CreateDefaultConfig(cfgPath); err != nil {
 			log.Fatalf("Failed to create config: %v", err)
@@ -74,7 +78,20 @@ func printUsage() {
 	fmt.Println("  $CONFIG         Environment variable for config file path")
 }
 
-func runServer(cfgPath string) {
+func parseServeArgs(args []string) (int, error) {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	port := fs.Int("port", 8080, "HTTP server port")
+	if err := fs.Parse(args); err != nil {
+		return 0, err
+	}
+	if fs.NArg() > 0 {
+		return 0, fmt.Errorf("unknown command: %s", fs.Arg(0))
+	}
+	return *port, nil
+}
+
+func runServer(cfgPath string, port int) {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -105,8 +122,8 @@ func runServer(cfgPath string) {
 	handler := handlers.NewAPIHandler(cfg, cfgPath, s3Client)
 	http.HandleFunc("/", handler.Handle)
 
-	fmt.Printf("Starting server on port %d...\n", *port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
+	fmt.Printf("Starting server on port %d...\n", port)
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

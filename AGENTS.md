@@ -198,6 +198,7 @@ If anything unexpected happens (test failures, build errors, behavior regression
   - integration tests for DB/network boundaries,
   - E2E only for critical user flows.
 - Avoid brittle tests tied to incidental implementation details.
+- When running tests, always run them in a sub-agent.
 
 ### 3. Type Safety and Invariants
 - Avoid suppressions (`any`, ignores) unless the project explicitly permits and you have no alternative.
@@ -272,6 +273,10 @@ A task is done when:
 ## Active Technologies
 - Go 1.21+ + aws-sdk-go-v2, embedded HTTP server (stdlib) (001-s3-file-browser)
 - JSON config file (~/.config/s3peep/config.json) (001-s3-file-browser)
+- Go 1.24 (for s3peep binary), Bash (for test scripts) + aws-sdk-go-v2 (s3peep), podman/podman-compose (environment), MinIO client `mc` (fixtures) (002-containerized-test-env)
+- MinIO container (S3-compatible local storage) (002-containerized-test-env)
+- Go 1.24 for `s3peep`; Bash for containerized shell tests + aws-sdk-go-v2, embedded stdlib HTTP server, podman/podman-compose, MinIO, MinIO client `mc`, `curl`, `jq` (002-containerized-test-env)
+- File-based JSON config at `~/.config/s3peep/config.json`; MinIO object storage with persistent test volume (002-containerized-test-env)
 
 ## Recent Changes
 - 001-s3-file-browser: Added Go 1.21+ + aws-sdk-go-v2, embedded HTTP server (stdlib)

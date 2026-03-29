@@ -1,0 +1,32 @@
+# Build stage for s3peep binary
+FROM golang:1.24-alpine AS s3peep-builder
+
+WORKDIR /go/src/app
+
+COPY ../go.mod ../go.sum ./
+RUN go mod download
+
+COPY ../ .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /s3peep ./cmd/s3peep
+
+# Test runner stage
+FROM alpine:latest
+
+RUN apk --no-cache add bash curl jq coreutils && \
+    curl -sL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc && \
+    chmod +x /usr/local/bin/mc
+
+WORKDIR /app
+
+# Copy test files from the test directory to the current directory
+COPY test/*.sh ./
+COPY test/helpers.sh ./
+COPY test/fixtures/ ./fixtures/
+COPY test/fixtures/scenarios/ ./fixtures/scenarios/
+
+# Copy s3peep binary from builder stage
+COPY --from=s3peep-builder /s3peep /home/s3peep/s3peep
+
+RUN chmod +x /app/*.sh /app/fixtures/*.sh /app/fixtures/scenarios/*.sh 2>/dev/null || true
+
+ENTRYPOINT ["/app/run_tests.sh"]

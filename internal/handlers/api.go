@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -379,13 +380,21 @@ document.addEventListener('DOMContentLoaded', () => {
 	return nil
 }
 
+// S3Service defines the S3 operations used by the API handler.
+type S3Service interface {
+	ListBuckets(ctx context.Context) ([]s3.Bucket, error)
+	ListObjects(ctx context.Context, prefix string) ([]s3.FileObject, error)
+	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
+	SetBucket(bucket string)
+}
+
 type APIHandler struct {
 	cfg         *config.Config
 	configPath  string
-	s3Client    *s3.Client
+	s3Client    S3Service
 }
 
-func NewAPIHandler(cfg *config.Config, configPath string, s3Client *s3.Client) *APIHandler {
+func NewAPIHandler(cfg *config.Config, configPath string, s3Client S3Service) *APIHandler {
 	if len(webAssets) == 0 {
 		LoadWebAssets()
 	}
@@ -432,8 +441,8 @@ func (h *APIHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 func (h *APIHandler) serveStatic(w http.ResponseWriter, r *http.Request, path string) {
 	contentTypes := map[string]string{
-		"/static/styles.css": "text/css",
-		"/static/app.js":     "application/javascript",
+		"static/styles.css": "text/css",
+		"static/app.js":     "application/javascript",
 	}
 
 	contentType, ok := contentTypes[path]
@@ -441,7 +450,7 @@ func (h *APIHandler) serveStatic(w http.ResponseWriter, r *http.Request, path st
 		contentType = "application/octet-stream"
 	}
 
-	data, ok := webAssets[path]
+	data, ok := webAssets["/"+path]
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -556,7 +565,7 @@ func (h *APIHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 	defer obj.Close()
 
-	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(key))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", path.Base(key)))
 	w.Header().Set("Content-Type", "application/octet-stream")
 	io.Copy(w, obj)
 }
