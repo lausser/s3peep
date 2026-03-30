@@ -277,6 +277,8 @@ A task is done when:
 - MinIO container (S3-compatible local storage) (002-containerized-test-env)
 - Go 1.24 for `s3peep`; Bash for containerized shell tests + aws-sdk-go-v2, embedded stdlib HTTP server, podman/podman-compose, MinIO, MinIO client `mc`, `curl`, `jq` (002-containerized-test-env)
 - File-based JSON config at `~/.config/s3peep/config.json`; MinIO object storage with persistent test volume (002-containerized-test-env)
+- S3-compatible object storage via AWS SDK (003-s3peep-web-ui)
+-  Build and Test has to happen in podman containers, it is absolutely forbidden to install modules/software on the host.
 
 ## Recent Changes
 - 001-s3-file-browser: Added Go 1.21+ + aws-sdk-go-v2, embedded HTTP server (stdlib)

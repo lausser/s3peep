@@ -88,10 +88,13 @@ go build -o s3peep ./cmd/s3peep
 docker build -t s3peep .
 ```
 
-## Open Issues
-- Frontend UI still has bugs with bucket selection (shows "undefined" in some cases)
+## Open Issues (Historical)
+- ~~Frontend UI still has bugs with bucket selection (shows "undefined" in some cases)~~ - Fixed
 - Upload functionality not implemented
-- No error handling for network failures during file transfer
+- ~~No error handling for network failures during file transfer~~ - Partially addressed
+
+## Related Lessons Learned
+- [003-download-implementation](./003-download-implementation.md) - File download challenges and solutions
 
 ## Summary
-The project is a working CLI tool with profile management and basic S3 browsing capability. Main challenges were around AWS SDK API changes and proper JSON serialization for the frontend.
+The project is a working CLI tool with profile management and basic S3 browsing capability. Main challenges were around AWS SDK API changes, proper JSON serialization for the frontend, and implementing reliable file downloads (see 003-download-implementation.md for details on download challenges).

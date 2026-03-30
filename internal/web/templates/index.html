@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 File Browser</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading...</span>
+        </div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-brand">
+                <h1>S3 File Browser</h1>
+            </div>
+            <div class="header-actions">
+                <button id="theme-toggle" class="btn-icon" title="Toggle theme">
+                    <span class="icon">🌙</span>
+                </button>
+                <div class="profile-info">
+                    <span id="profile-name">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main">
+            <!-- View: Bucket List -->
+            <div id="bucket-view" class="view">
+                <div class="view-header">
+                    <h2>Select a Bucket</h2>
+                    <div class="filter-container">
+                        <input 
+                            type="text" 
+                            id="bucket-filter" 
+                            class="filter-input" 
+                            placeholder="Type to filter buckets..."
+                            aria-label="Filter buckets"
+                        >
+                        <span class="filter-hint">Press <kbd>/</kbd> to focus</span>
+                    </div>
+                </div>
+                
+                <div class="content-area">
+                    <!-- Skeleton loader -->
+                    <div id="bucket-skeleton" class="skeleton-list hidden">
+                        <div class="skeleton-item"></div>
+                        <div class="skeleton-item"></div>
+                        <div class="skeleton-item"></div>
+                        <div class="skeleton-item"></div>
+                        <div class="skeleton-item"></div>
+                    </div>
+                    
+                    <!-- Bucket list -->
+                    <div id="bucket-list" class="bucket-list">
+                        <!-- Dynamically populated -->
+                    </div>
+                    
+                    <!-- Empty state -->
+                    <div id="bucket-empty" class="empty-state hidden">
+                        <div class="empty-icon">📁</div>
+                        <h3>No buckets found</h3>
+                        <p>No buckets match your filter criteria.</p>
+                        <button id="clear-bucket-filter" class="btn btn-primary">Clear Filter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: File Browser -->
+            <div id="file-view" class="view hidden">
+                <!-- Breadcrumb navigation -->
+                <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb">
+                    <!-- Dynamically populated -->
+                </nav>
+
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <button id="btn-back" class="btn btn-secondary">
+                            <span class="icon">←</span> Back to Buckets
+                        </button>
+                    </div>
+                    <div class="toolbar-center">
+                        <div class="filter-container">
+                            <input 
+                                type="text" 
+                                id="file-filter" 
+                                class="filter-input" 
+                                placeholder="Filter files..."
+                                aria-label="Filter files"
+                            >
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <button id="btn-new-folder" class="btn btn-secondary">
+                            <span class="icon">📁</span> New Folder
+                        </button>
+                        <button id="btn-upload" class="btn btn-primary">
+                            <span class="icon">⬆️</span> Upload
+                        </button>
+                        <input type="file" id="file-input" multiple hidden>
+                    </div>
+                </div>
+
+                <!-- Content area -->
+                <div class="content-area">
+                    <!-- Skeleton loader -->
+                    <div id="file-skeleton" class="skeleton-list hidden">
+                        <div class="skeleton-item file-item"></div>
+                        <div class="skeleton-item file-item"></div>
+                        <div class="skeleton-item file-item"></div>
+                        <div class="skeleton-item file-item"></div>
+                        <div class="skeleton-item file-item"></div>
+                    </div>
+
+                    <!-- File list -->
+                    <div id="file-list" class="file-list">
+                        <!-- Dynamically populated -->
+                    </div>
+
+                    <!-- Empty state -->
+                    <div id="file-empty" class="empty-state hidden">
+                        <div class="empty-icon">📂</div>
+                        <h3>This folder is empty</h3>
+                        <p>Drag and drop files here or use the Upload button.</p>
+                    </div>
+
+                    <!-- Filter empty state -->
+                    <div id="file-filter-empty" class="empty-state hidden">
+                        <div class="empty-icon">🔍</div>
+                        <h3>No files match</h3>
+                        <p>No files match your filter criteria.</p>
+                        <button id="clear-file-filter" class="btn btn-primary">Clear Filter</button>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div id="pagination" class="pagination">
+                    <div class="pagination-controls">
+                        <button id="btn-first" class="btn btn-small" disabled>First</button>
+                        <button id="btn-prev" class="btn btn-small" disabled>Previous</button>
+                        <span id="page-info" class="page-info">Page 1</span>
+                        <button id="btn-next" class="btn btn-small">Next</button>
+                        <button id="btn-last" class="btn btn-small" disabled>Last</button>
+                    </div>
+                    <div class="page-size-selector">
+                        <label for="page-size">Items per page:</label>
+                        <select id="page-size" class="select-small">
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100" selected>100</option>
+                            <option value="250">250</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Drag overlay -->
+                <div id="drag-overlay" class="drag-overlay hidden">
+                    <div class="drag-message">
+                        <span class="icon">⬆️</span>
+                        <h3>Drop files here to upload</h3>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Upload progress panel -->
+        <div id="upload-panel" class="upload-panel hidden">
+            <div class="upload-panel-header">
+                <h3>Uploads</h3>
+                <button id="btn-close-uploads" class="btn-icon">✕</button>
+            </div>
+            <div id="upload-list" class="upload-list">
+                <!-- Upload tasks dynamically added here -->
+            </div>
+        </div>
+
+        <!-- Toast notifications -->
+        <div id="toast-container" class="toast-container" role="status" aria-live="polite">
+            <!-- Toasts dynamically added here -->
+        </div>
+
+        <!-- Modals -->
+        
+        <!-- Delete confirmation modal -->
+        <div id="delete-modal" class="modal hidden" role="dialog" aria-labelledby="delete-title" aria-modal="true">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="delete-title">Confirm Delete</h3>
+                    <button class="btn-icon modal-close" data-modal="delete-modal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p id="delete-message">Are you sure you want to delete the selected items?</p>
+                    <div id="delete-items" class="delete-items-list"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-modal="delete-modal">Cancel</button>
+                    <button id="btn-confirm-delete" class="btn btn-danger">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conflict resolution modal -->
+        <div id="conflict-modal" class="modal hidden" role="dialog" aria-labelledby="conflict-title" aria-modal="true">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="conflict-title">File Already Exists</h3>
+                    <button class="btn-icon modal-close" data-modal="conflict-modal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p>A file with this name already exists:</p>
+                    <div class="conflict-files">
+                        <div class="file-comparison">
+                            <div class="file-existing">
+                                <h4>Existing</h4>
+                                <p id="conflict-existing-name"></p>
+                                <p id="conflict-existing-size"></p>
+                                <p id="conflict-existing-date"></p>
+                            </div>
+                            <div class="file-new">
+                                <h4>New</h4>
+                                <p id="conflict-new-name"></p>
+                                <p id="conflict-new-size"></p>
+                                <p id="conflict-new-date"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="conflict-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="apply-to-all">
+                            Apply to all remaining files
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-skip" class="btn btn-secondary">Skip</button>
+                    <button id="btn-rename" class="btn btn-secondary">Keep Both</button>
+                    <button id="btn-replace" class="btn btn-primary">Replace</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- New folder modal -->
+        <div id="folder-modal" class="modal hidden" role="dialog" aria-labelledby="folder-title" aria-modal="true">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="folder-title">Create New Folder</h3>
+                    <button class="btn-icon modal-close" data-modal="folder-modal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="folder-name">Folder name:</label>
+                        <input type="text" id="folder-name" class="form-input" placeholder="Enter folder name">
+                        <span class="form-hint">Folder names cannot contain: / \ : * ? " < > |</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-modal="folder-modal">Cancel</button>
+                    <button id="btn-create-folder" class="btn btn-primary">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyboard shortcuts help -->
+        <div id="shortcuts-modal" class="modal hidden" role="dialog" aria-labelledby="shortcuts-title" aria-modal="true">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="shortcuts-title">Keyboard Shortcuts</h3>
+                    <button class="btn-icon modal-close" data-modal="shortcuts-modal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <dl class="shortcuts-list">
+                        <dt><kbd>/</kbd></dt>
+                        <dd>Focus filter input</dd>
+                        <dt><kbd>Esc</kbd></dt>
+                        <dd>Clear filter / Close modal</dd>
+                        <dt><kbd>Ctrl/Cmd + K</kbd></dt>
+                        <dd>Quick navigation</dd>
+                        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt>
+                        <dd>Navigate list</dd>
+                        <dt><kbd>Enter</kbd></dt>
+                        <dd>Open selected item</dd>
+                        <dt><kbd>Delete</kbd></dt>
+                        <dd>Delete selected (with confirmation)</dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" data-modal="shortcuts-modal">Got it</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/components/error.js"></script>
+    <script src="/static/js/components/empty-state.js"></script>
+    <script src="/static/js/components/bucket-list.js"></script>
+    <script src="/static/js/components/bucket-filter.js"></script>
+    <script src="/static/js/components/file-list.js"></script>
+    <script src="/static/js/components/file-filter.js"></script>
+    <script src="/static/js/components/breadcrumb.js"></script>
+    <script src="/static/js/components/pagination.js"></script>
+    <script src="/static/js/components/upload-progress.js"></script>
+    <script src="/static/js/components/upload-zone.js"></script>
+    <script src="/static/js/components/conflict-modal.js"></script>
+    <script src="/static/js/keyboard.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
