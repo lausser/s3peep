@@ -33,3 +33,15 @@ Thumbs.db
 
 # Config with secrets (keep template)
 config.json
+
+# AI agent directories
+.claude/
+.opencode/
+.serena/
+.specify/
+
+# Binary
+s3peep
+
+# Agent instructions
+AGENTS.md
