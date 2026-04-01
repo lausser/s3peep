@@ -109,10 +109,16 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
         .view { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .filter-input { width: 100%; max-width: 400px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
         .bucket-list, .file-list { margin-top: 20px; }
-        .bucket-item, .file-item { padding: 15px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; }
+        .bucket-item, .file-item { padding: 15px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: space-between; }
         .bucket-item:hover, .file-item:hover { background: #f0f0f0; }
+        .file-item.selected { background: #e3f2fd; border-color: #2196f3; }
         .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px; }
         .btn-primary { background: #0066cc; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:disabled { background: #6c757d; cursor: not-allowed; }
+        .file-checkbox { margin-right: 10px; cursor: pointer; }
+        .delete-btn { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .delete-btn:hover { background: #c82333; }
         .btn-secondary { background: #6c757d; color: white; }
         .empty-state { text-align: center; padding: 60px 20px; color: #666; }
         .error { color: #dc3545; padding: 20px; background: #f8d7da; border-radius: 4px; margin: 20px 0; }
@@ -146,6 +152,12 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 <button id="btn-back" class="btn btn-secondary">← Back to Buckets</button>
             </div>
             <div id="breadcrumb" style="margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px;"></div>
+            <div style="margin-bottom: 20px;">
+                <button id="btn-create-folder" class="btn btn-primary">+ New Folder</button>
+                <button id="btn-upload" class="btn btn-primary">+ Upload File</button>
+                <button id="btn-delete-selected" class="btn btn-danger" disabled>Delete Selected</button>
+                <input type="file" id="file-upload-input" class="hidden">
+            </div>
             <input type="text" id="file-filter" class="filter-input" placeholder="Filter files...">
             <div id="file-loading" class="loading hidden">Loading files...</div>
             <div id="file-list" class="file-list"></div>
@@ -166,7 +178,8 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 currentBucket: null,
                 currentPath: '',
                 files: [],
-                filteredFiles: []
+                filteredFiles: [],
+                selectedItems: new Set()
             };
 
             // Get token from URL
@@ -189,6 +202,10 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 fileFilter: document.getElementById('file-filter'),
                 breadcrumb: document.getElementById('breadcrumb'),
                 btnBack: document.getElementById('btn-back'),
+                btnCreateFolder: document.getElementById('btn-create-folder'),
+                btnUpload: document.getElementById('btn-upload'),
+                btnDeleteSelected: document.getElementById('btn-delete-selected'),
+                fileUploadInput: document.getElementById('file-upload-input'),
                 profileName: document.getElementById('profile-name')
             };
 
@@ -328,6 +345,10 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 // Update breadcrumb
                 renderBreadcrumb();
                 
+                // Clear selection when rendering
+                state.selectedItems.clear();
+                updateDeleteButton();
+                
                 // Filter files based on current filter
                 const filter = els.fileFilter.value.toLowerCase();
                 const filesToShow = filter 
@@ -346,24 +367,63 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 if (state.currentPath) {
                     const parentPath = state.currentPath.replace(/[^/]+\/$/, '');
                     html += '<div class="file-item parent-folder" data-key="' + parentPath + '" data-folder="true">' +
-                        '📁 .. (Parent Folder)' +
+                        '<span>📁 .. (Parent Folder)</span>' +
                         '</div>';
                 }
                 
                 // Add files and folders
                 html += filesToShow.map(f => {
                     const icon = f.is_folder ? '📁' : '📄';
-                    return '<div class="file-item" data-key="' + escapeHtml(f.key) + '" data-folder="' + f.is_folder + '">' +
+                    const isSelected = state.selectedItems.has(f.key);
+                    return '<div class="file-item' + (isSelected ? ' selected' : '') + '" data-key="' + escapeHtml(f.key) + '" data-folder="' + f.is_folder + '" data-name="' + escapeHtml(f.name) + '">' +
+                        '<span class="file-content">' +
+                        '<input type="checkbox" class="file-checkbox" data-key="' + escapeHtml(f.key) + '">' +
                         icon + ' ' + escapeHtml(f.name) +
+                        '</span>' +
+                        '<button class="delete-btn" data-key="' + escapeHtml(f.key) + '" data-name="' + escapeHtml(f.name) + '">Delete</button>' +
                         '</div>';
                 }).join('');
 
                 els.fileList.innerHTML = html;
                 els.fileEmpty.classList.add('hidden');
 
-                // Add click handlers
+                // Add click handlers for navigation and checkboxes
                 els.fileList.querySelectorAll('.file-item').forEach(item => {
-                    item.addEventListener('click', () => {
+                    const checkbox = item.querySelector('.file-checkbox');
+                    const deleteBtn = item.querySelector('.delete-btn');
+                    const content = item.querySelector('.file-content');
+                    
+                    // Checkbox change handler
+                    if (checkbox) {
+                        checkbox.addEventListener('change', (e) => {
+                            e.stopPropagation();
+                            if (e.target.checked) {
+                                state.selectedItems.add(item.dataset.key);
+                                item.classList.add('selected');
+                            } else {
+                                state.selectedItems.delete(item.dataset.key);
+                                item.classList.remove('selected');
+                            }
+                            updateDeleteButton();
+                        });
+                    }
+                    
+                    // Individual delete button handler
+                    if (deleteBtn) {
+                        deleteBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const name = deleteBtn.dataset.name;
+                            const key = deleteBtn.dataset.key;
+                            if (confirm('Are you sure you want to delete "' + name + '"?')) {
+                                deleteItems([key]);
+                            }
+                        });
+                    }
+                    
+                    // Click on item (not checkbox or delete button) for navigation/download
+                    item.addEventListener('click', (e) => {
+                        if (e.target === checkbox || e.target === deleteBtn) return;
+                        
                         if (item.dataset.folder === 'true') {
                             state.currentPath = item.dataset.key;
                             els.fileFilter.value = ''; // Clear filter when navigating
@@ -373,6 +433,102 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                         }
                     });
                 });
+            }
+            
+            // Update delete button state
+            function updateDeleteButton() {
+                els.btnDeleteSelected.disabled = state.selectedItems.size === 0;
+                els.btnDeleteSelected.textContent = state.selectedItems.size > 0 
+                    ? 'Delete Selected (' + state.selectedItems.size + ')' 
+                    : 'Delete Selected';
+            }
+            
+            // Delete items
+            async function deleteItems(keys) {
+                if (!keys || keys.length === 0) return;
+                
+                // Check if any folders are being deleted and get their contents
+                let allKeys = [...keys];
+                let foldersWithContents = [];
+                
+                for (const key of keys) {
+                    if (key.endsWith('/')) {
+                        // This is a folder, check if it has contents
+                        try {
+                            const response = await fetch(baseUrl + '/buckets/' + 
+                                encodeURIComponent(state.currentBucket) + '/objects?prefix=' + 
+                                encodeURIComponent(key));
+                            const data = await response.json();
+                            const objects = data.objects || [];
+                            
+                            if (objects.length > 1) {
+                                // More than just the folder marker
+                                foldersWithContents.push({
+                                    key: key,
+                                    count: objects.length
+                                });
+                                // Add all child objects to the delete list
+                                objects.forEach(obj => {
+                                    if (!allKeys.includes(obj.key)) {
+                                        allKeys.push(obj.key);
+                                    }
+                                });
+                            }
+                        } catch (err) {
+                            console.error('Failed to check folder contents:', err);
+                        }
+                    }
+                }
+                
+                // Build confirmation message
+                let confirmMsg = '';
+                if (foldersWithContents.length > 0) {
+                    const folderNames = foldersWithContents.map(f => {
+                        const name = f.key.replace(/\/$/, '').split('/').pop();
+                        return '"' + name + '" (' + f.count + ' items)';
+                    }).join(', ');
+                    confirmMsg = 'You are deleting ' + foldersWithContents.length + ' folder(s) with contents: ' + folderNames + '.\n\n';
+                }
+                
+                const itemCount = allKeys.length;
+                const itemLabel = itemCount === 1 ? 'item' : 'items';
+                confirmMsg += 'Are you sure you want to delete ' + itemCount + ' ' + itemLabel + '?';
+                
+                if (!confirm(confirmMsg)) {
+                    return; // User cancelled
+                }
+                
+                try {
+                    const response = await fetch(baseUrl + '/buckets/' + encodeURIComponent(state.currentBucket) + '/objects', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ keys: allKeys })
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Delete failed');
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Clear selection
+                    keys.forEach(key => state.selectedItems.delete(key));
+                    updateDeleteButton();
+                    
+                    // Show results
+                    if (result.failed && result.failed.length > 0) {
+                        const failedNames = result.failed.map(f => f.key.split('/').pop()).join(', ');
+                        alert('Deleted ' + result.deleted.length + ' items. Failed to delete: ' + failedNames);
+                    } else {
+                        alert('Successfully deleted ' + result.deleted.length + ' items');
+                    }
+                    
+                    loadFiles(); // Refresh file list
+                } catch (err) {
+                    console.error('Failed to delete:', err);
+                    alert('Failed to delete: ' + err.message);
+                }
             }
 
             // Filter files
@@ -416,6 +572,79 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 els.bucketView.classList.remove('hidden');
                 state.currentBucket = null;
             });
+
+            // Delete selected button
+            els.btnDeleteSelected.addEventListener('click', () => {
+                const keys = Array.from(state.selectedItems);
+                if (keys.length === 0) return;
+                
+                const names = keys.map(k => k.split('/').pop()).join(', ');
+                if (confirm('Are you sure you want to delete ' + keys.length + ' item(s): ' + names + '?')) {
+                    deleteItems(keys);
+                }
+            });
+
+            // Create folder button
+            els.btnCreateFolder.addEventListener('click', () => {
+                const folderName = prompt('Enter folder name:');
+                if (folderName && folderName.trim()) {
+                    createFolder(folderName.trim());
+                }
+            });
+
+            // Upload button
+            els.btnUpload.addEventListener('click', () => {
+                els.fileUploadInput.click();
+            });
+
+            // File upload input change
+            els.fileUploadInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    uploadFile(file);
+                    els.fileUploadInput.value = ''; // Reset input
+                }
+            });
+
+            // Create folder
+            async function createFolder(folderName) {
+                try {
+                    const folderPath = state.currentPath + folderName + '/';
+                    await api('PUT', '/buckets/' + encodeURIComponent(state.currentBucket) + '/folders', {
+                        folder_path: folderPath
+                    });
+                    loadFiles(); // Refresh file list
+                } catch (err) {
+                    console.error('Failed to create folder:', err);
+                    alert('Failed to create folder: ' + err.message);
+                }
+            }
+
+            // Upload file
+            async function uploadFile(file) {
+                try {
+                    const formData = new FormData();
+                    const key = state.currentPath + file.name;
+                    formData.append('file', file);
+                    formData.append('key', key);
+                    formData.append('overwrite', 'false');
+
+                    const response = await fetch(baseUrl + '/buckets/' + encodeURIComponent(state.currentBucket) + '/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Upload failed');
+                    }
+
+                    loadFiles(); // Refresh file list
+                } catch (err) {
+                    console.error('Failed to upload file:', err);
+                    alert('Failed to upload file: ' + err.message);
+                }
+            }
 
             // Escape HTML
             function escapeHtml(text) {
