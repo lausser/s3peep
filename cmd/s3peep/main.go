@@ -6,9 +6,12 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/lausser/s3peep/internal/config"
 	"github.com/lausser/s3peep/internal/handlers"
@@ -16,9 +19,42 @@ import (
 )
 
 var (
-	configFlag = flag.String("config", "", "Path to config file (or set $CONFIG)")
-	debugFlag  = flag.Bool("debug", false, "Enable debug logging")
+	configFlag *string
+	debugFlag  *bool
 )
+
+func init() {
+	// Create a custom flag set for consistent double-dash output
+	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	// Discard default output - we'll handle errors ourselves
+	fs.SetOutput(io.Discard)
+	
+	// Override usage to show double dashes
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		fs.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(os.Stderr, "  --%s %s\n", f.Name, f.DefValue)
+			fmt.Fprintf(os.Stderr, "\t%s\n", f.Usage)
+		})
+	}
+	
+	// Define flags on custom flag set
+	configFlag = fs.String("config", "", "Path to config file (or set $CONFIG)")
+	debugFlag = fs.Bool("debug", false, "Enable debug logging")
+	
+	// Replace the default flag.CommandLine with our custom one
+	flag.CommandLine = fs
+}
+
+// normalizeFlagError converts single-dash error messages to double-dash format
+func normalizeFlagError(err error) string {
+	errMsg := err.Error()
+	// Replace single-dash with double-dash in error messages
+	// Replace " -flag" with " --flag" at end of message or before end quote
+	re := regexp.MustCompile(`([:\s"])-(\w+)`)
+	errMsg = re.ReplaceAllString(errMsg, "${1}--${2}")
+	return errMsg
+}
 
 func getConfigPath() string {
 	if envPath := os.Getenv("CONFIG"); envPath != "" {
@@ -31,7 +67,19 @@ func getConfigPath() string {
 }
 
 func main() {
-	flag.CommandLine.Parse(os.Args[1:])
+	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
+		// Convert single-dash error messages to double-dash
+		errMsg := normalizeFlagError(err)
+		// Don't print "help requested" as an error - just show usage
+		if !strings.Contains(errMsg, "help requested") {
+			fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+		}
+		flag.Usage()
+		if strings.Contains(errMsg, "help requested") {
+			return
+		}
+		os.Exit(1)
+	}
 	cfgPath := getConfigPath()
 
 	args := flag.Args()
@@ -44,13 +92,17 @@ func main() {
 	case "profile":
 		cli := config.NewCLI(cfgPath)
 		if err := cli.Run(args[1:]); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err.Error() != "" {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
 			os.Exit(1)
 		}
 	case "serve":
 		port, debug, err := parseServeArgs(args[1:])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			if err.Error() != "" {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
 			os.Exit(1)
 		}
 		runServer(cfgPath, port, debug)
@@ -84,11 +136,27 @@ func printUsage() {
 
 func parseServeArgs(args []string) (int, bool, error) {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
+	// Override usage to show double dashes
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of serve:\n")
+		fs.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(os.Stderr, "  --%s %s\n", f.Name, f.DefValue)
+			fmt.Fprintf(os.Stderr, "\t%s\n", f.Usage)
+		})
+	}
 	port := fs.Int("port", 8080, "HTTP server port")
 	debug := fs.Bool("debug", false, "Enable debug logging")
 	if err := fs.Parse(args); err != nil {
-		return 0, false, err
+		// Normalize error and check for help request
+		errMsg := normalizeFlagError(err)
+		if !strings.Contains(errMsg, "help requested") {
+			fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+			fs.Usage()
+			return 0, false, fmt.Errorf("")
+		}
+		// For help request, Usage was already called by flag package
+		return 0, false, fmt.Errorf("")
 	}
 	if fs.NArg() > 0 {
 		return 0, false, fmt.Errorf("unknown command: %s", fs.Arg(0))

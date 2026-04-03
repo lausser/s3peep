@@ -65,3 +65,28 @@ func SwitchProfile(cfg *Config, name string) error {
 	}
 	return errors.New("profile not found")
 }
+
+func UpdateProfile(cfg *Config, name string, updates Profile) error {
+	for i := range cfg.Profiles {
+		if cfg.Profiles[i].Name == name {
+			// Update only fields that are provided (non-empty)
+			if updates.Region != "" {
+				cfg.Profiles[i].Region = updates.Region
+			}
+			if updates.AccessKeyID != "" {
+				cfg.Profiles[i].AccessKeyID = updates.AccessKeyID
+			}
+			if updates.SecretAccessKey != "" {
+				cfg.Profiles[i].SecretAccessKey = updates.SecretAccessKey
+			}
+			if updates.EndpointURL != "" {
+				cfg.Profiles[i].EndpointURL = updates.EndpointURL
+			}
+			if updates.Bucket != "" {
+				cfg.Profiles[i].Bucket = updates.Bucket
+			}
+			return nil
+		}
+	}
+	return errors.New("profile not found")
+}

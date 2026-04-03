@@ -354,6 +354,140 @@ func TestCLI_removeProfile(t *testing.T) {
 	}
 }
 
+func TestCLI_updateProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	
+	// Create config with profiles
+	cfg := &Config{
+		ActiveProfile: "test-profile",
+		Profiles: []Profile{
+			{
+				Name:            "test-profile",
+				Region:          "us-east-1",
+				AccessKeyID:     "old-access-key",
+				SecretAccessKey: "old-secret-key",
+				EndpointURL:     "http://old-endpoint",
+				Bucket:          "old-bucket",
+			},
+			{
+				Name:            "other-profile",
+				Region:          "eu-west-1",
+				AccessKeyID:     "other-key",
+				SecretAccessKey: "other-secret",
+				EndpointURL:     "",
+				Bucket:          "",
+			},
+		},
+	}
+	
+	if err := Save(cfg, configPath); err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	cli := NewCLI(configPath)
+	
+	// Test updating endpoint only
+	if err := cli.Run([]string{"update", "--name", "test-profile", "--endpoint", "http://new-endpoint:9000"}); err != nil {
+		t.Errorf("CLI updateProfile endpoint: unexpected error: %v", err)
+	}
+	
+	// Verify config was updated
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load config after update: %v", err)
+	}
+	// Endpoint should be updated
+	if cfg.Profiles[0].EndpointURL != "http://new-endpoint:9000" {
+		t.Errorf("CLI updateProfile endpoint: expected 'http://new-endpoint:9000', got %s", cfg.Profiles[0].EndpointURL)
+	}
+	// Other fields should remain unchanged
+	if cfg.Profiles[0].Region != "us-east-1" {
+		t.Errorf("CLI updateProfile endpoint: region should not change, got %s", cfg.Profiles[0].Region)
+	}
+	if cfg.Profiles[0].AccessKeyID != "old-access-key" {
+		t.Errorf("CLI updateProfile endpoint: access key should not change, got %s", cfg.Profiles[0].AccessKeyID)
+	}
+	if cfg.Profiles[0].SecretAccessKey != "old-secret-key" {
+		t.Errorf("CLI updateProfile endpoint: secret key should not change, got %s", cfg.Profiles[0].SecretAccessKey)
+	}
+	if cfg.Profiles[0].Bucket != "old-bucket" {
+		t.Errorf("CLI updateProfile endpoint: bucket should not change, got %s", cfg.Profiles[0].Bucket)
+	}
+	
+	// Test updating multiple fields at once
+	if err := cli.Run([]string{"update", "--name", "test-profile", "--region", "us-west-2", "--access-key", "new-access-key", "--secret", "new-secret-key"}); err != nil {
+		t.Errorf("CLI updateProfile multiple fields: unexpected error: %v", err)
+	}
+	
+	// Verify config was updated
+	cfg, err = Load(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load config after update: %v", err)
+	}
+	if cfg.Profiles[0].Region != "us-west-2" {
+		t.Errorf("CLI updateProfile multiple: expected region 'us-west-2', got %s", cfg.Profiles[0].Region)
+	}
+	if cfg.Profiles[0].AccessKeyID != "new-access-key" {
+		t.Errorf("CLI updateProfile multiple: expected access key 'new-access-key', got %s", cfg.Profiles[0].AccessKeyID)
+	}
+	if cfg.Profiles[0].SecretAccessKey != "new-secret-key" {
+		t.Errorf("CLI updateProfile multiple: expected secret key 'new-secret-key', got %s", cfg.Profiles[0].SecretAccessKey)
+	}
+	// Endpoint should still be from previous update
+	if cfg.Profiles[0].EndpointURL != "http://new-endpoint:9000" {
+		t.Errorf("CLI updateProfile multiple: endpoint should not change, got %s", cfg.Profiles[0].EndpointURL)
+	}
+	
+	// Test updating bucket
+	if err := cli.Run([]string{"update", "--name", "test-profile", "--bucket", "new-bucket"}); err != nil {
+		t.Errorf("CLI updateProfile bucket: unexpected error: %v", err)
+	}
+	
+	cfg, err = Load(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load config after update: %v", err)
+	}
+	if cfg.Profiles[0].Bucket != "new-bucket" {
+		t.Errorf("CLI updateProfile bucket: expected 'new-bucket', got %s", cfg.Profiles[0].Bucket)
+	}
+	
+	// Test updating other profile
+	if err := cli.Run([]string{"update", "--name", "other-profile", "--region", "ap-south-1"}); err != nil {
+		t.Errorf("CLI updateProfile other profile: unexpected error: %v", err)
+	}
+	
+	cfg, err = Load(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load config after update: %v", err)
+	}
+	if cfg.Profiles[1].Region != "ap-south-1" {
+		t.Errorf("CLI updateProfile other: expected region 'ap-south-1', got %s", cfg.Profiles[1].Region)
+	}
+	// First profile should be unchanged
+	if cfg.Profiles[0].Region != "us-west-2" {
+		t.Errorf("CLI updateProfile other: first profile region should not change, got %s", cfg.Profiles[0].Region)
+	}
+	
+	// Test updating with missing name flag
+	if err := cli.Run([]string{"update", "--region", "us-east-1"}); err == nil {
+		t.Errorf("CLI updateProfile missing name: expected error, got nil")
+	} else {
+		if !strings.Contains(err.Error(), "profile name is required") {
+			t.Errorf("CLI updateProfile missing name: unexpected error: %v", err)
+		}
+	}
+	
+	// Test updating non-existent profile
+	if err := cli.Run([]string{"update", "--name", "nonexistent", "--region", "us-east-1"}); err == nil {
+		t.Errorf("CLI updateProfile nonexistent: expected error, got nil")
+	} else {
+		if !strings.Contains(err.Error(), "profile not found") {
+			t.Errorf("CLI updateProfile nonexistent: unexpected error: %v", err)
+		}
+	}
+}
+
 func TestCLI_run_invalid_command(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

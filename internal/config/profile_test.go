@@ -234,3 +234,103 @@ func TestSwitchProfile(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateProfile(t *testing.T) {
+	cfg := &Config{
+		Profiles: []Profile{
+			{
+				Name:            "profile1",
+				Region:          "us-east-1",
+				AccessKeyID:     "old-access-key",
+				SecretAccessKey: "old-secret-key",
+				EndpointURL:     "http://old-endpoint",
+				Bucket:          "old-bucket",
+			},
+			{
+				Name:            "profile2",
+				Region:          "eu-west-1",
+				AccessKeyID:     "key2",
+				SecretAccessKey: "secret2",
+				EndpointURL:     "",
+				Bucket:          "",
+			},
+		},
+	}
+
+	// Test updating region
+	updates := Profile{
+		Region: "us-west-2",
+	}
+	if err := UpdateProfile(cfg, "profile1", updates); err != nil {
+		t.Errorf("UpdateProfile region: unexpected error: %v", err)
+	}
+	if cfg.Profiles[0].Region != "us-west-2" {
+		t.Errorf("UpdateProfile region: expected 'us-west-2', got %s", cfg.Profiles[0].Region)
+	}
+	// Ensure other fields are unchanged
+	if cfg.Profiles[0].AccessKeyID != "old-access-key" {
+		t.Errorf("UpdateProfile region: access key should not change")
+	}
+
+	// Test updating endpoint
+	updates = Profile{
+		EndpointURL: "http://new-endpoint",
+	}
+	if err := UpdateProfile(cfg, "profile1", updates); err != nil {
+		t.Errorf("UpdateProfile endpoint: unexpected error: %v", err)
+	}
+	if cfg.Profiles[0].EndpointURL != "http://new-endpoint" {
+		t.Errorf("UpdateProfile endpoint: expected 'http://new-endpoint', got %s", cfg.Profiles[0].EndpointURL)
+	}
+
+	// Test updating access key and secret
+	updates = Profile{
+		AccessKeyID:     "new-access-key",
+		SecretAccessKey: "new-secret-key",
+	}
+	if err := UpdateProfile(cfg, "profile1", updates); err != nil {
+		t.Errorf("UpdateProfile credentials: unexpected error: %v", err)
+	}
+	if cfg.Profiles[0].AccessKeyID != "new-access-key" {
+		t.Errorf("UpdateProfile credentials: access key not updated")
+	}
+	if cfg.Profiles[0].SecretAccessKey != "new-secret-key" {
+		t.Errorf("UpdateProfile credentials: secret key not updated")
+	}
+
+	// Test updating bucket
+	updates = Profile{
+		Bucket: "new-bucket",
+	}
+	if err := UpdateProfile(cfg, "profile1", updates); err != nil {
+		t.Errorf("UpdateProfile bucket: unexpected error: %v", err)
+	}
+	if cfg.Profiles[0].Bucket != "new-bucket" {
+		t.Errorf("UpdateProfile bucket: expected 'new-bucket', got %s", cfg.Profiles[0].Bucket)
+	}
+
+	// Test updating non-existent profile
+	updates = Profile{
+		Region: "ap-south-1",
+	}
+	if err := UpdateProfile(cfg, "nonexistent", updates); err == nil {
+		t.Errorf("UpdateProfile non-existent: expected error, got nil")
+	} else if !strings.Contains(err.Error(), "profile not found") {
+		t.Errorf("UpdateProfile non-existent: unexpected error: %v", err)
+	}
+
+	// Test updating second profile (to ensure we don't always update first)
+	updates = Profile{
+		Region: "eu-central-1",
+	}
+	if err := UpdateProfile(cfg, "profile2", updates); err != nil {
+		t.Errorf("UpdateProfile second profile: unexpected error: %v", err)
+	}
+	if cfg.Profiles[1].Region != "eu-central-1" {
+		t.Errorf("UpdateProfile second profile: region not updated")
+	}
+	// First profile should be unchanged
+	if cfg.Profiles[0].Region != "us-west-2" {
+		t.Errorf("UpdateProfile second profile: first profile was incorrectly modified")
+	}
+}
