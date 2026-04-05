@@ -340,6 +340,22 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 });
             }
 
+            // Format file size for display
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // Format date for display
+            function formatDate(dateString) {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                return date.toLocaleString();
+            }
+            
             // Render files
             function renderFiles() {
                 // Update breadcrumb
@@ -353,7 +369,7 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 const filter = els.fileFilter.value.toLowerCase();
                 const filesToShow = filter 
                     ? state.files.filter(f => f.name.toLowerCase().includes(filter))
-                    : state.files;
+                    : [...state.files];
                 
                 if (filesToShow.length === 0 && !state.currentPath) {
                     els.fileEmpty.classList.remove('hidden');
@@ -363,11 +379,24 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 
                 let html = '';
                 
+                // Add header row
+                html += '<div class="file-header" style="display: flex; padding: 10px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-weight: bold; color: #666;">' +
+                    '<span style="flex: 0 0 30px;"></span>' +
+                    '<span style="flex: 2;">Name</span>' +
+                    '<span style="flex: 1; text-align: right;">Size</span>' +
+                    '<span style="flex: 1; text-align: right;">Modified</span>' +
+                    '<span style="flex: 0 0 80px; text-align: center;">Action</span>' +
+                    '</div>';
+                
                 // Add ".." parent folder link if not at root
                 if (state.currentPath) {
                     const parentPath = state.currentPath.replace(/[^/]+\/$/, '');
-                    html += '<div class="file-item parent-folder" data-key="' + parentPath + '" data-folder="true">' +
-                        '<span>📁 .. (Parent Folder)</span>' +
+                    html += '<div class="file-item parent-folder" data-key="' + parentPath + '" data-folder="true" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">' +
+                        '<span style="flex: 0 0 30px;"></span>' +
+                        '<span style="flex: 2;">📁 .. (Parent Folder)</span>' +
+                        '<span style="flex: 1; text-align: right;">-</span>' +
+                        '<span style="flex: 1; text-align: right;">-</span>' +
+                        '<span style="flex: 0 0 80px; text-align: center;"></span>' +
                         '</div>';
                 }
                 
@@ -375,12 +404,14 @@ func (h *APIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
                 html += filesToShow.map(f => {
                     const icon = f.is_folder ? '📁' : '📄';
                     const isSelected = state.selectedItems.has(f.key);
-                    return '<div class="file-item' + (isSelected ? ' selected' : '') + '" data-key="' + escapeHtml(f.key) + '" data-folder="' + f.is_folder + '" data-name="' + escapeHtml(f.name) + '">' +
-                        '<span class="file-content">' +
-                        '<input type="checkbox" class="file-checkbox" data-key="' + escapeHtml(f.key) + '">' +
-                        icon + ' ' + escapeHtml(f.name) +
-                        '</span>' +
-                        '<button class="delete-btn" data-key="' + escapeHtml(f.key) + '" data-name="' + escapeHtml(f.name) + '">Delete</button>' +
+                    const size = f.is_folder ? '-' : formatFileSize(f.size || 0);
+                    const modified = f.last_modified ? formatDate(f.last_modified) : '-';
+                    return '<div class="file-item' + (isSelected ? ' selected' : '') + '" data-key="' + escapeHtml(f.key) + '" data-folder="' + f.is_folder + '" data-name="' + escapeHtml(f.name) + '" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">' +
+                        '<span style="flex: 0 0 30px;"><input type="checkbox" class="file-checkbox" data-key="' + escapeHtml(f.key) + '"></span>' +
+                        '<span style="flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + icon + ' ' + escapeHtml(f.name) + '</span>' +
+                        '<span style="flex: 1; text-align: right; color: #666; font-size: 14px;">' + size + '</span>' +
+                        '<span style="flex: 1; text-align: right; color: #666; font-size: 14px;">' + modified + '</span>' +
+                        '<span style="flex: 0 0 80px; text-align: center;"><button class="delete-btn" data-key="' + escapeHtml(f.key) + '" data-name="' + escapeHtml(f.name) + '">Delete</button></span>' +
                         '</div>';
                 }).join('');
 
